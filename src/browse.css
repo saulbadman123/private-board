@@ -1,0 +1,21 @@
+.browse{margin-bottom:20px;min-width:0}
+.search-field label{font-size:13px;font-weight:600;display:block;margin-bottom:8px}
+.search-field input,.filter-field input,.filter-field select{display:block;width:100%;min-width:0;min-height:48px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--text);background:var(--surface);font-family:inherit;font-size:16px;line-height:1.4}
+.search-field small,.filter-field small,.filter-help{display:block;font-size:11px;color:var(--muted);line-height:1.7;margin-top:7px}
+#feed-filters{border-bottom:1px solid var(--line);margin-top:8px}
+#feed-filters summary{cursor:pointer;min-height:48px;padding-block:14px;font-size:12px;font-weight:600}
+#active-filters{color:var(--accent);margin-left:4px}
+.filter-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;padding-block:6px}
+.filter-field label{display:block;margin-bottom:7px;font-size:12px;font-weight:600}
+.filter-wide{grid-column:1/-1}.filter-help{margin-bottom:16px}
+.filter-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;font-size:11px;color:var(--muted)}
+.entry-tags>button{font:inherit;font-size:11px;color:var(--accent);background:var(--soft);border:0;border-radius:8px;min-height:44px;padding:8px 12px;overflow-wrap:anywhere;max-width:100%;text-align:left}
+.entry-tags>button:hover{outline:1px solid var(--accent)}
+.feed-status{min-height:20px}.pagination{flex-wrap:wrap}.open-note{min-height:44px}
+.composer-heading .secondary,.format-toolbar button{min-height:44px}
+.post-status{font-size:12px;line-height:1.7;border:1px solid var(--line);border-radius:9px;background:var(--soft);padding:14px 16px;margin-bottom:20px}
+.post-status a{color:var(--accent);display:inline-block;min-height:44px;padding-block:12px;margin-left:8px;text-underline-offset:3px}
+#feed[aria-busy=true]{opacity:.6}#feed{transition:opacity .1s}
+.draw-colors .color-swatch{min-width:44px;width:44px}select{outline-offset:4px}
+@media(max-width:420px){.filter-grid{grid-template-columns:minmax(0,1fr);gap:14px}.filter-wide{grid-column:auto}.entry-meta{flex-wrap:wrap}.composer-heading{align-items:flex-start}.composer-heading p{max-width:170px}.post-row{gap:10px}.pagination>*{flex:1}input[type=date]{max-width:100%}}
+@media(prefers-reduced-motion:reduce){#feed{transition:none}}

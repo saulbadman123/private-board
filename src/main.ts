@@ -1,0 +1,183 @@
+import './styles.css';
+import './notes.css';
+import './drawing.css';
+import './browse.css';
+import { api, ApiError } from './api.ts';
+import type { BoardResponse } from './api.ts';
+import { cycleTheme, getTheme } from './theme.ts';
+import { mountBoard } from './board.ts';
+import { clearDraft, hasDrafts } from './drafts.ts';
+
+const root = document.querySelector<HTMLDivElement>('#app')!;
+const boardPattern = /^\/b\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/e\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}))?\/?$/i;
+let request: AbortController | undefined;
+let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+let toastTimer: ReturnType<typeof setTimeout>;
+let generation = 0;
+let currentBoard: string | null = null;
+let privateVisible = false;
+let disposeBoard: (()=>void) | undefined;
+const paths = {
+  lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/>',
+  arrow: '<path d="m5 12 14 0m-5-5 5 5-5 5"/>',
+  link: '<path d="m10 13 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 3 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0"/>',
+  theme: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
+  book: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v18m4-12h4m-4 4h4"/>',
+  check: '<path d="m5 12 4 4L19 6"/>'
+};
+function icon(name: keyof typeof paths, cls = ''): string { return `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`; }
+function escape(value: string): string { return value.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!)); }
+function toast(message: string) {
+  const target = document.querySelector<HTMLDivElement>('#toast')!;
+  target.textContent = message; target.classList.add('visible'); clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => target.classList.remove('visible'), 3500);
+}
+function navigate(path: string) { history.pushState({}, '', path); void route(); }
+function frame(content: string, wide = false) {
+  root.innerHTML = `<header class="site-header"><a class="brand" href="/" aria-label="Private Board home">${icon('book')}<span>private board<span class="brand-dot">.</span></span></a><button id="theme" class="icon-button" aria-label="Change theme">${icon('theme')}</button></header><main id="main" class="${wide ? 'board-main' : 'home-main'}">${content}</main><footer class="site-footer"><span>A little space, kept between you.</span><span>${icon('lock')} No accounts. Just a password.</span></footer>`;
+  root.querySelector<HTMLAnchorElement>('.brand')!.addEventListener('click', e => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); navigate('/'); } });
+  const button = root.querySelector<HTMLButtonElement>('#theme')!;
+  const label = () => { button.title = `Theme: ${getTheme()}. Click to change.`; button.setAttribute('aria-label', button.title); };
+  label(); button.addEventListener('click', () => { cycleTheme(); label(); });
+}
+function passwordField(id: string, creating: boolean): string {
+  return `<div class="field"><label for="${id}">Board password</label><div class="password-wrap"><input id="${id}" name="password" type="password" autocomplete="${creating ? 'new-password' : 'current-password'}" required ${creating ? 'minlength="12"' : ''} aria-describedby="password-hint"/><button type="button" class="show-password" aria-controls="${id}" aria-pressed="false">Show</button></div><small id="password-hint">${creating ? 'At least 12 characters. A few memorable words work well.' : 'The same password everyone on this board uses.'}</small></div>`;
+}
+function wirePassword() {
+  const button = root.querySelector<HTMLButtonElement>('.show-password');
+  button?.addEventListener('click', () => {
+    const input = root.querySelector<HTMLInputElement>(`#${button.getAttribute('aria-controls')}`)!;
+    const showing = input.type === 'password'; input.type = showing ? 'text' : 'password';
+    button.textContent = showing ? 'Hide' : 'Show'; button.setAttribute('aria-pressed', String(showing));
+  });
+}
+function formError(form: HTMLFormElement, message: string) {
+  const el = form.querySelector<HTMLElement>('.form-error')!; el.textContent = message; el.hidden = false;
+}
+function busy(form: HTMLFormElement, state: boolean) {
+  const button = form.querySelector<HTMLButtonElement>('[type="submit"]')!;
+  button.disabled = state; form.setAttribute('aria-busy', String(state));
+  button.querySelector('.button-label')!.textContent = state ? 'Please wait…' : button.dataset.label!;
+}
+function clearSecrets(form: HTMLFormElement) { const input = form.querySelector<HTMLInputElement>('[name="password"]'); if (input) input.value = ''; }
+
+function home() {
+  frame(`<section class="intro"><div class="eyebrow"><span class="tiny-dot"></span> A quiet corner of the internet</div><h1>Good thoughts<br/>deserve a place<br/><span>to stay.</span></h1><p class="intro-copy">A private space for shared notes and sketches.<br class="desktop-break"/> Open a board, pass along the password, make it yours.</p><div class="principles"><span>${icon('lock')} Private by password</span><span>${icon('check')} No sign-up</span></div></section><section class="access-panel" aria-label="Board access"><div class="panel-tabs" role="tablist" aria-label="Choose board action"><button id="create-tab" role="tab" aria-selected="true" aria-controls="access-content">Create a board</button><button id="open-tab" role="tab" aria-selected="false" aria-controls="access-content" tabindex="-1">Open a board</button></div><div id="access-content" role="tabpanel" aria-labelledby="create-tab"></div></section>`);
+  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  function select(index: number) {
+    tabs.forEach((t, i) => { t.setAttribute('aria-selected', String(i === index)); t.tabIndex = i === index ? 0 : -1; });
+    const content = root.querySelector<HTMLElement>('#access-content')!; content.setAttribute('aria-labelledby', tabs[index].id);
+    if (index === 0) {
+      content.innerHTML = `<form id="create-form"><h2>A space of your own.</h2><p class="muted">Give it a name and a password. That’s all.</p><div class="field"><label for="board-title">Board name</label><input id="board-title" name="title" placeholder="A place for our ideas" maxlength="80" autocomplete="off" required/></div>${passwordField('create-password', true)}<div class="soft-notice">Keep your link and password somewhere safe. There’s no account to recover them.</div><p class="form-error" role="alert" hidden></p><button class="primary" type="submit" data-label="Create board"><span class="button-label">Create board</span>${icon('arrow')}</button><p class="fine-print">Shared anonymously. Made to stay.</p></form>`;
+      wirePassword();
+      const form = root.querySelector<HTMLFormElement>('#create-form')!;
+      form.addEventListener('submit', async e => {
+        e.preventDefault(); const myGeneration = generation; busy(form, true); form.querySelector<HTMLElement>('.form-error')!.hidden = true;
+        try {
+          const data = new FormData(form);
+          const response = await api<BoardResponse>('/api/boards', { title: data.get('title'), password: data.get('password') }, request!.signal);
+          clearSecrets(form);
+          if (myGeneration !== generation) return;
+          history.pushState({}, '', `/b/${response.board.id}`);
+          currentBoard = response.board.id; showBoard(response); toast('Board created. Keep the link and password safe.');
+        } catch (error) { if (myGeneration === generation && !(error instanceof DOMException && error.name === 'AbortError')) formError(form, error instanceof Error ? error.message : 'Please try again.'); }
+        finally { busy(form, false); }
+      });
+    } else {
+      content.innerHTML = `<form id="open-form"><h2>Come on in.</h2><p class="muted">Paste a board link or enter its board ID.</p><div class="field"><label for="board-link">Board link or ID</label><input id="board-link" name="link" type="text" placeholder="Paste your board link" autocomplete="off" autocapitalize="off" spellcheck="false" required/></div><p class="form-error" role="alert" hidden></p><button class="primary" type="submit" data-label="Open board"><span class="button-label">Open board</span>${icon('arrow')}</button><p class="fine-print">You’ll enter the password next.</p></form>`;
+      const form = root.querySelector<HTMLFormElement>('#open-form')!;
+      form.addEventListener('submit', e => {
+        e.preventDefault(); const raw = String(new FormData(form).get('link')).trim();
+        const id = /^[0-9a-f-]{36}$/i.test(raw) ? raw : (() => { try { const url = new URL(raw, location.origin); return url.origin === location.origin ? url.pathname.match(boardPattern)?.[1] : null; } catch { return null; } })();
+        if (!id || !boardPattern.test(`/b/${id}`)) { formError(form, 'Enter a complete board link from this website or a valid board ID.'); return; }
+        let entryId:string|undefined;
+        try {entryId=new URL(raw,location.origin).pathname.match(boardPattern)?.[2];}catch{/* bare board ID */}
+        navigate(`/b/${id.toLowerCase()}${entryId?`/e/${entryId.toLowerCase()}`:''}`);
+      });
+    }
+  }
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(i));
+    tab.addEventListener('keydown', e => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) { e.preventDefault(); const next = e.key === 'Home' ? 0 : e.key === 'End' ? 1 : 1 - i; select(next); tabs[next].focus(); } });
+  });
+  select(0);
+}
+
+function gate(boardId: string, errorMessage = '') {
+  disposeBoard?.();disposeBoard=undefined;clearTimeout(expiryTimer);
+  generation++;request?.abort();request=new AbortController();
+  privateVisible = false; document.title = 'Unlock board · Private Board';
+  frame(`<section class="gate"><div class="gate-symbol">${icon('lock')}</div><div class="eyebrow">A space between you</div><h1>This board is private.</h1><p class="muted gate-copy">Have the password? You’re in the right place.</p><form id="unlock-form">${passwordField('unlock-password', false)}<p class="form-error" role="alert" ${errorMessage ? '' : 'hidden'}>${escape(errorMessage)}</p><button class="primary" type="submit" data-label="Unlock board"><span class="button-label">Unlock board</span>${icon('arrow')}</button></form><a class="text-link" href="/" id="back-home">Back to home</a></section>`);
+  wirePassword();
+  root.querySelector<HTMLAnchorElement>('#back-home')!.addEventListener('click', e => { e.preventDefault(); navigate('/'); });
+  const form = root.querySelector<HTMLFormElement>('#unlock-form')!;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); const myGeneration = generation; busy(form, true); form.querySelector<HTMLElement>('.form-error')!.hidden = true;
+    try {
+      const response = await api<BoardResponse>(`/api/boards/${boardId}/unlock`, { password: new FormData(form).get('password') }, request!.signal);
+      clearSecrets(form); if (myGeneration === generation) showBoard(response);
+    } catch (error) { if (myGeneration === generation && !(error instanceof DOMException && error.name === 'AbortError')) formError(form, error instanceof Error ? error.message : 'Please try again.'); }
+    finally { busy(form, false); }
+  });
+}
+
+function showBoard(response: BoardResponse) {
+  disposeBoard?.();
+  clearTimeout(expiryTimer); privateVisible = true; currentBoard = response.board.id;
+  document.title = `${response.board.title} · Private Board`;
+  frame(`<section class="board-header"><div><div class="eyebrow">${icon('lock')} Your private space</div><h1>${escape(response.board.title)}</h1></div><div class="board-actions"><button id="copy-link" class="secondary">${icon('link')} Copy link</button><button id="lock-board" class="icon-button" aria-label="Lock this board" title="Lock this board">${icon('lock')}</button></div></section><div id="board-content"></div>`, true);
+  disposeBoard=mountBoard({container:root.querySelector<HTMLElement>('#board-content')!,response,entryId:location.pathname.match(boardPattern)?.[2]?.toLowerCase(),signal:request!.signal,navigate,expired:message=>gate(response.board.id,message),toast});
+  root.querySelector<HTMLButtonElement>('#copy-link')!.addEventListener('click', async () => {
+    const url = `${location.origin}/b/${response.board.id}`;
+    try { await navigator.clipboard.writeText(url); toast('Board link copied. Share the password separately.'); }
+    catch { window.prompt('Copy your board link:', url); }
+  });
+  root.querySelector<HTMLButtonElement>('#lock-board')!.addEventListener('click', async e => {
+    const myGeneration = generation;
+    const button = e.currentTarget as HTMLButtonElement; button.disabled = true;
+    try {
+      await api(`/api/boards/${response.board.id}/lock`, {}, request!.signal);
+      if (myGeneration !== generation) return;
+      clearDraft(response.board.id);clearTimeout(expiryTimer); gate(response.board.id); toast('Board locked on this browser.');
+    } catch (error) {
+      if (myGeneration !== generation) return;
+      // Wipe content even when the network cannot confirm revocation; be candid.
+      clearDraft(response.board.id);gate(response.board.id, 'Content hidden, but locking could not be confirmed. Reconnect and unlock, then lock again.');
+    }
+  });
+  expiryTimer = setTimeout(() => gate(response.board.id, 'Your access expired. Enter the password to open this board again.'), Math.max(0, Date.parse(response.expiresAt) - Date.now()));
+}
+
+async function route() {
+  disposeBoard?.();disposeBoard=undefined;
+  generation++; const myGeneration = generation;
+  request?.abort(); request = new AbortController(); clearTimeout(expiryTimer); privateVisible = false;
+  currentBoard = null; document.title = 'Private Board';
+  if (location.pathname === '/') { home(); return; }
+  const match = location.pathname.match(boardPattern);
+  if (!match) { frame('<section class="gate"><h1>A wrong turn.</h1><p class="muted">Check your board link, or use the name above to return home.</p></section>'); return; }
+  const id = match[1].toLowerCase(); currentBoard = id;
+  frame('<section class="gate loading" role="status"><span class="loading-dot"></span><p>Opening your space…</p></section>');
+  try { const response = await api<BoardResponse>(`/api/boards/${id}`, undefined, request.signal); if (myGeneration === generation) showBoard(response); }
+  catch (error) {
+    if (myGeneration !== generation) return;
+    if (error instanceof ApiError) gate(id, error.status === 401 ? '' : error.message);
+    else if (!(error instanceof DOMException && error.name === 'AbortError')) gate(id, 'Could not open this board. Please try again.');
+  }
+}
+
+window.addEventListener('popstate', () => void route());
+window.addEventListener('pageshow', e => { if (e.persisted) void route(); });
+// Hide private data before a page snapshot or while a background tab can go stale.
+function hidePrivate() {
+  if(!privateVisible)return;
+  generation++;request?.abort();disposeBoard?.();disposeBoard=undefined;
+  root.replaceChildren();document.title='Private Board';privateVisible=false;
+}
+window.addEventListener('pagehide',hidePrivate);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && privateVisible) hidePrivate();
+  else if (!document.hidden && currentBoard && root.childElementCount === 0) void route();
+});
+window.addEventListener('beforeunload',e=>{if(hasDrafts()){e.preventDefault();e.returnValue='';}});
+void route();
