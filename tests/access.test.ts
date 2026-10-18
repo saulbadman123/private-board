@@ -24,7 +24,7 @@ test('complete board flow enforces isolation, expiry, lock, and anonymous safe r
   assert.match(created.headers.get('set-cookie')!, /__Host-board_session=.+; Path=\/; HttpOnly; SameSite=Strict; Max-Age=604800; Secure/);
   assert.match(created.headers.get('cache-control')!, /no-store/);
   const result = await created.json(); const first = result.board.id; const firstCookie = cookie(created);
-  assert.deepEqual(Object.keys(result.board).sort(), ['created_at','id','title']);
+  assert.deepEqual(Object.keys(result.board).sort(), ['created_at','id','listed','title']);
   assert(!JSON.stringify(result).includes(password));
   assert.equal((await app(req(path(first)))).status, 401);
   assert.equal((await app(req(path(first), { cookie:firstCookie }))).status, 200);

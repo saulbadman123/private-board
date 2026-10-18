@@ -21,6 +21,7 @@ test('migration executes on PostgreSQL and enforces grants, RLS, append-only ent
     await db.exec(await readFile(new URL('../supabase/migrations/202610160002_markdown_notes.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../supabase/migrations/202610160003_drawings.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../supabase/migrations/202610160004_search_filters.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../supabase/migrations/202610160005_board_directory.sql', import.meta.url), 'utf8'));
     const tables = ['boards','entries','board_sessions','rate_limit_buckets'];
     const hash='scrypt$1$131072$8$1$'+'11'.repeat(16)+'$'+'22'.repeat(32);
     const token='a'.repeat(64), requestHash='b'.repeat(64);
@@ -57,7 +58,7 @@ test('migration executes on PostgreSQL and enforces grants, RLS, append-only ent
       await assert.rejects(db.exec("update public.entries set markdown='changed'"),/immutable/);
       await assert.rejects(db.exec('delete from public.entries'),/immutable/);
       await assert.rejects(db.exec('truncate public.entries'),/immutable/);
-      await assert.rejects(db.query('delete from public.boards where id=$1',[id]),/foreign key/);
+      await assert.rejects(db.query('delete from public.boards where id=$1',[id]),/immutable/);
     });
 
     await t.test('constraints reject malformed entries and repeated request identifiers', async () => {

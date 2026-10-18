@@ -1,10 +1,10 @@
-# Private Board v0.4.0 — Start here
+# Private Board v0.5.0 — Start here
 
 ## Already using Stage 3?
 
 1. Extract this release into a new folder. Keep the old project until the upgrade works.
 2. Copy your existing `.env.local` into the new project root. No variable names or values need to change.
-3. In Supabase SQL Editor, run **only** `supabase/migrations/202610160004_search_filters.sql`.
+3. In Supabase SQL Editor, run **only** `supabase/migrations/202610160005_board_directory.sql` (v0.4.0 installations). Older installations first need the missing earlier migrations, in order.
 4. Stop the old development server. Open a terminal in the new project folder and run `npm ci`, then `npm run dev`.
 5. Open `http://localhost:5173` with your existing board link and password. The search box and **Filters & sort** controls are below the composer.
 
@@ -14,7 +14,7 @@ For Vercel, apply the new migration, update the source, and redeploy the complet
 
 ## Starting from scratch or an older stage?
 
-Follow `README.md`. A fresh database needs all four migrations in filename order. A Stage 1 database needs migrations two, three, and four. A Stage 2 database needs migrations three and four. Never rerun migrations already applied successfully.
+Follow `README.md`. A fresh database needs all five migrations in filename order. A Stage 1 database needs migrations two, three, and four. A Stage 2 database needs migrations three and four. Never rerun migrations already applied successfully.
 
 Use Node.js 24 LTS, create `.env.local` from `.env.example`, and run `npm ci` then `npm run dev`. Open the Vite address, not the source `index.html` by double-clicking it.
 

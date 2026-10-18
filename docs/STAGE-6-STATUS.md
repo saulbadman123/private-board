@@ -1,6 +1,8 @@
 # Stage 6 status — production launch kit
 
-Prepared 16 October 2026. This stage delivers the launch procedure and operating documents. **No Supabase project, Vercel project, domain, or secret was created or touched**, and **nothing has been built or run**: Node.js was unavailable, so Stages 5 and 6 are untested. Run `npm ci` and `npm run verify` (see `STAGE-5-STATUS.md`) before relying on them.
+Prepared 16 October 2026. This stage delivers the launch procedure and operating documents. **No Supabase project, Vercel project, domain, or secret was created or touched.**
+
+Update, 18 October 2026: `npm ci` and `npm run verify` were run locally on Node 24.20.0 and passed. The result was 60 tests passed, 1 skipped (the live Supabase test), and 0 failed; the bundle check also passed. See `STAGE-5-STATUS.md` for details. This confirms the source, not the deployment.
 
 ## Delivered
 
@@ -18,7 +20,7 @@ Prepared 16 October 2026. This stage delivers the launch procedure and operating
 | Full create/unlock/note/draw/search/lock journey on the production domain | Not done |
 | Restore rehearsal | Not done |
 | Alerts, capacity thresholds, backup of database and Storage | Not done |
-| Production bundle free of private keys | Enforced by `npm run build`, not yet run |
+| Production bundle free of private keys | Local build check passed 18 Oct 2026; rerun on Vercel with production env |
 | Android/iOS/keyboard checks | Not done |
 
 The plan's gate is not met until every row is complete.

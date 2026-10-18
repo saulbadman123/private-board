@@ -1,4 +1,5 @@
-export type Board = { id: string; title: string; created_at: string };
+export type Board = { id: string; title: string; created_at: string; listed?: boolean };
+export type BoardSearchResult = { boards: { id: string; title: string; created_at: string }[]; more: boolean };
 export type BoardResponse = { board: Board; expiresAt: string };
 export class ApiError extends Error {
   status: number;

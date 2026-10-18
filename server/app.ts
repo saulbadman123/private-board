@@ -5,6 +5,7 @@ import { prepareNote, NoteInputError, NoteStoreError } from './notes.ts';
 import {parseFeedQuery,decodeSearchCursor,encodeSearchCursor} from './search.ts';
 import {HttpError} from './errors.ts';
 import {postDrawing} from './drawings.ts';
+import {parseDirectoryQuery} from './directory.ts';
 
 const WEEK = 7 * 24 * 60 * 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -61,9 +62,9 @@ async function body(request: Request, maxBytes=4096): Promise<Record<string, unk
 function readOnly(): HttpError {
   return new HttpError(503, 'READ_ONLY', 'New posts are paused while storage capacity is expanded. Your draft is still here; try again later.', 300);
 }
-function password(value: unknown, creating: boolean): string {
-  if (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 256 || value.length === 0 || (creating && [...value].length < 12)) {
-    throw new HttpError(400, 'PASSWORD', creating ? 'Use at least 12 characters, up to 256 bytes.' : 'Enter your board password.');
+function password(value: unknown, creating: boolean, minimum = 12): string {
+  if (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 256 || value.length === 0 || (creating && [...value].length < minimum)) {
+    throw new HttpError(400, 'PASSWORD', creating ? `Use at least ${minimum} characters, up to 256 bytes.` : 'Enter your board password.');
   }
   return value;
 }
@@ -100,24 +101,33 @@ export function createApp(store: Store, config: AppConfig, clock: () => number =
       const boardId = (match ?? entriesMatch)?.[1].toLowerCase();
       const action = match?.[2];
       const collection=!!entriesMatch && !entriesMatch[2];
-      const allowed=collection ? ['GET','POST'] : creating || action ? ['POST'] : ['GET'];
+      const allowed=collection ? ['GET','POST'] : creating ? ['GET','POST'] : action ? ['POST'] : ['GET'];
       if (!allowed.includes(request.method)) return json({ error: { code: 'METHOD', message: 'This action is not available.' } }, 405, { Allow: allowed.join(', ') });
       const method=request.method;
       if (method === 'POST') guardOrigin(request, config);
       const ip = clientIp(request);
       await limit('api-ip', ip, 300, 60);
 
+      if (creating && method === 'GET') {
+        // Public name lookup. Only boards whose creators chose to list them can match.
+        await limit('directory', ip, 30, 60);
+        await limit('directory-global', 'deployment', 3000, 60);
+        const rows = await store.searchBoards(parseDirectoryQuery(new URL(request.url).searchParams));
+        return json({ boards: rows.slice(0, 20).map(({ id, title, created_at }) => ({ id, title, created_at })), more: rows.length > 20 });
+      }
       if (creating) {
         if (config.writesDisabled) throw readOnly();
         await limit('create', ip, 5, 3600);
         await limit('create-global', 'deployment', 500, 3600);
         const input = await body(request);
-        if (Object.keys(input).some(k => !['title','password'].includes(k))) throw new HttpError(400, 'FIELDS', 'Unexpected information.');
-        const boardTitle = title(input.title); const secret = password(input.password, true);
+        if (Object.keys(input).some(k => !['title','password','listed'].includes(k))) throw new HttpError(400, 'FIELDS', 'Unexpected information.');
+        if (input.listed !== undefined && typeof input.listed !== 'boolean') throw new HttpError(400, 'FIELDS', 'Unexpected information.');
+        const listed = input.listed === true;
+        const boardTitle = title(input.title); const secret = password(input.password, true, listed ? 16 : 12);
         const hashed = await hashPassword(secret);
         const token = await browserSession(request);
         const expiresAt = new Date(clock() + WEEK * 1000).toISOString();
-        const board = await store.createBoard({ title: boardTitle, password_hash: hashed, token_hash: digestToken(token), expires_at: expiresAt });
+        const board = await store.createBoard({ title: boardTitle, password_hash: hashed, token_hash: digestToken(token), expires_at: expiresAt, listed });
         return json({ board, expiresAt }, 201, { 'Set-Cookie': sessionCookie(token, config) });
       }
       if (action === 'unlock') {

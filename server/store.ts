@@ -3,7 +3,7 @@ import { NoteStoreError } from './notes.ts';
 import type { Entry, PostResponse } from '../shared/contracts.ts';
 import type {SearchRow} from './search.ts';
 import {checksum} from './images.ts';
-import type { AppConfig, Board, BoardCredential, LimitResult, SessionGrant, Store } from './types.ts';
+import type { AppConfig, Board, BoardCredential, BoardSummary, LimitResult, SessionGrant, Store } from './types.ts';
 
 export function createStore(config: AppConfig): Store {
   const db = createClient(config.supabaseUrl, config.secretKey, {
@@ -19,14 +19,18 @@ export function createStore(config: AppConfig): Store {
   return {
     async createBoard(input) {
       const { data, error } = await db.rpc('create_board_with_session', {
-        p_title: input.title, p_password_hash: input.password_hash, p_token_hash: input.token_hash, p_expires_at: input.expires_at
+        p_title: input.title, p_password_hash: input.password_hash, p_token_hash: input.token_hash, p_expires_at: input.expires_at, p_listed: input.listed
       });
       check(error);
       if (!data?.[0]) throw new Error('Missing board result');
       return data[0] as Board;
     },
+    async searchBoards(words) {
+      const { data, error } = await db.rpc('search_listed_boards', { p_words: words });
+      check(error); return (data ?? []) as BoardSummary[];
+    },
     async findCredential(boardId) {
-      const { data, error } = await db.from('boards').select('id,title,password_hash,created_at').eq('id', boardId).maybeSingle();
+      const { data, error } = await db.from('boards').select('id,title,password_hash,created_at,listed').eq('id', boardId).maybeSingle();
       check(error); return data as BoardCredential | null;
     },
     async hasSession(tokenHash) {
@@ -46,7 +50,7 @@ export function createStore(config: AppConfig): Store {
       check(error);
     },
     async board(boardId) {
-      const { data, error } = await db.from('boards').select('id,title,created_at').eq('id', boardId).maybeSingle();
+      const { data, error } = await db.from('boards').select('id,title,created_at,listed').eq('id', boardId).maybeSingle();
       check(error); return data as Board | null;
     },
     async postNote(input) {

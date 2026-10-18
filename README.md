@@ -1,11 +1,12 @@
-# Private Board — Stage 4 / v0.4.0
+# Private Board — Stage 7 / v0.5.0
 
 A small, mobile-first private Markdown and drawing board. Built with Vite, TypeScript, a Vercel Node.js API, and Supabase. No accounts and no browser-side database credentials. Start with `START-HERE.md` if you are upgrading an existing installation.
 
 ## What works in this release
 
 - Create a board with a name and a shared password.
-- Open a board using its link or UUID.
+- Find a board by name from the home page (only boards whose creators chose "List in search"), or open any board from its link.
+- Write and draw on a separate composer page (`/b/{id}/new`); the board page is for reading, search and filters.
 - Unlock through server-side scrypt verification.
 - Keep independent board access in one secure browser session.
 - Copy a board link and lock a board on the current browser.
@@ -37,7 +38,7 @@ Install Node.js 24 LTS. Extract the archive, then open a terminal inside this fo
 npm ci
 ```
 
-Create a dedicated **development** Supabase project. In SQL Editor, run all four files in `supabase/migrations/` in filename order: foundation, Markdown notes, drawings, then search/filters. **If Stage 3 is already installed, run only `202610160004_search_filters.sql`.** If upgrading from Stage 2, run migrations three and four. Do not rerun already-applied migrations on an existing installation. Alternatively, use the Supabase CLI migration workflow described in `docs/SETUP.md`.
+Create a dedicated **development** Supabase project. In SQL Editor, run all five files in `supabase/migrations/` in filename order: foundation, Markdown notes, drawings, search/filters, then board directory. **If v0.4.0 is already installed, run only `202610160005_board_directory.sql`.** If upgrading from Stage 2, run migrations three and four. Do not rerun already-applied migrations on an existing installation. Alternatively, use the Supabase CLI migration workflow described in `docs/SETUP.md`.
 
 Copy `.env.example` to `.env.local` (on Windows, `copy .env.example .env.local`; on macOS/Linux, `cp .env.example .env.local`). Fill in your development project URL and server secret key. Generate the independent rate-limit secret with:
 

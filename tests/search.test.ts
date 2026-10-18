@@ -69,7 +69,7 @@ test('PostgreSQL search indexes, exact relevance cursors, date/type/tag filters,
       create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
       create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);
       alter table storage.objects enable row level security;grant usage on schema public,storage to anon,authenticated,service_role;`);
-    for(const file of ['202610160001_foundation.sql','202610160002_markdown_notes.sql','202610160003_drawings.sql','202610160004_search_filters.sql'])await db.exec(await readFile(new URL(`../supabase/migrations/${file}`,import.meta.url),'utf8'));
+    for(const file of ['202610160001_foundation.sql','202610160002_markdown_notes.sql','202610160003_drawings.sql','202610160004_search_filters.sql','202610160005_board_directory.sql'])await db.exec(await readFile(new URL(`../supabase/migrations/${file}`,import.meta.url),'utf8'));
     const password='scrypt$1$131072$8$1$'+'11'.repeat(16)+'$'+'22'.repeat(32),board=randomUUID(),other=randomUUID();
     await db.query('insert into public.boards(id,title,password_hash) values($1,\'Search\',$3),($2,\'Other\',$3)',[board,other,password]);
     // A single statement intentionally gives all 63 entries the same timestamp.

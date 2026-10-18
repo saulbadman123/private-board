@@ -2,16 +2,18 @@
 
 Prepared 16 October 2026. Source changes on top of v0.4.0. No hosted database or Vercel deployment was modified.
 
-## NOT YET VERIFIED — read this first
+## Local verification — 18 October 2026
 
-Node.js was not installed in the environment where this stage was written, so **nothing in this stage has been compiled, type-checked, built, or run**. The new tests (`tests/reliability.test.ts`, `tests/operations.test.ts`) and the `scripts/ops.mjs` operator tool are unexecuted. Before relying on any of it, run:
+Run on Windows 11 with Node.js 24.20.0 and npm 11.19.0. No source changes were needed.
 
-```bash
-npm ci
-npm run verify
-```
+- `npm ci`: 73 packages added, 0 vulnerabilities.
+- `npm run verify`: passed (exit 0).
+  - `tsc --noEmit` clean; `vite build` succeeded.
+  - Bundle check passed with no server-only references. Compressed size: shell 12.0 KiB (budget 40), all JS 40.1 KiB (budget 100), CSS 5.3 KiB (budget 15).
+  - `npm test`: **61 tests, 60 passed, 0 failed, 1 skipped**. The skipped test is the live Supabase denial test, which needs `.env.local` and a test project (`npm run test:database`). That is up from 49 passed in v0.4.0, and every new test in `reliability.test.ts` and `operations.test.ts` passes.
+  - The "Private Board: backend operation failed" lines in the test output are expected. They come from the failure-injection tests, which check that only this generic message is logged.
 
-Fix anything that fails and update this file with the real test count (v0.4.0 reported 49 passed, 1 skipped). No claim below should be read as a measured result.
+`scripts/ops.mjs` was not run, because it needs a real Supabase project. The behavior of the database function and restore script it relies on is covered by `operations.test.ts` against PGlite.
 
 ## Review of the Phase 5 list
 
@@ -40,7 +42,8 @@ No migration, dependency, table, or endpoint was added.
 
 ## Still open (cannot be done from source)
 
-- Run the new tests and `npm run verify`.
+- ~~Run the new tests and `npm run verify`.~~ Done 18 October 2026 (see above).
+- `npm run test:database` and `npm run ops:integrity` / `ops:cleanup` against a real test project.
 - Live Supabase denial tests, Vercel runtime behavior, native Sharp packaging, cookie/proxy headers.
 - Measured request sizes, scrypt concurrency/latency, and query plans on representative data.
 - Real device checks (Android Chrome, iOS Safari, keyboard, screen reader, 320px).
@@ -51,4 +54,4 @@ No migration, dependency, table, or endpoint was added.
 - Sessions and limiter rows are never cleaned automatically; schedule `ops:cleanup` or `pg_cron`.
 - Fixed-window limits permit a burst across a window boundary.
 - Read endpoints also fail closed when the limiter is down, which is stricter than the plan requires.
-- `dist/` contains stale hashed assets from earlier builds; a clean build is recommended before measuring bundle size.
+- The 18 October build started with no `dist/`, so the bundle sizes above come from a clean build.

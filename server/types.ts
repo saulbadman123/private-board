@@ -1,13 +1,15 @@
 import type { Entry, PostResponse } from '../shared/contracts.ts';
 import type { SearchCursor, SearchRow } from './search.ts';
 import type { FeedQuery } from '../shared/browse.ts';
-export type Board = { id: string; title: string; created_at: string };
+export type Board = { id: string; title: string; created_at: string; listed?: boolean };
+export type BoardSummary = { id: string; title: string; created_at: string };
 export type BoardCredential = Board & { password_hash: string };
 export type SessionGrant = { expires_at: string };
 export type LimitResult = { allowed: boolean; retry_after: number };
 
 export interface Store {
-  createBoard(input: { title: string; password_hash: string; token_hash: string; expires_at: string }): Promise<Board>;
+  createBoard(input: { title: string; password_hash: string; token_hash: string; expires_at: string; listed: boolean }): Promise<Board>;
+  searchBoards(words: string[]): Promise<BoardSummary[]>;
   findCredential(boardId: string): Promise<BoardCredential | null>;
   hasSession(tokenHash: string): Promise<boolean>;
   findGrant(tokenHash: string, boardId: string): Promise<SessionGrant | null>;

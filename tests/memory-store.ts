@@ -21,8 +21,15 @@ export class MemoryStore implements Store {
   unavailable = false;
   now: () => number;
   constructor(now: () => number = Date.now) { this.now = now; }
-  async createBoard(input: {title:string;password_hash:string;token_hash:string;expires_at:string}) {
-    const board = { id: randomUUID(), title: input.title, password_hash: input.password_hash, created_at: new Date(this.now()).toISOString() };
+  async searchBoards(words: string[]) {
+    if (this.unavailable) throw new Error('offline');
+    this.searches.push(words);
+    return [...this.credentials.values()].filter(b => b.listed && words.every(w => (b.title.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).some(t => t.startsWith(w))))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 21).map(({ id, title, created_at }) => ({ id, title, created_at }));
+  }
+  searches: string[][] = [];
+  async createBoard(input: {title:string;password_hash:string;token_hash:string;expires_at:string;listed:boolean}) {
+    const board = { id: randomUUID(), title: input.title, password_hash: input.password_hash, created_at: new Date(this.now()).toISOString(), listed: input.listed };
     this.credentials.set(board.id, board); await this.grant(input.token_hash, board.id, input.expires_at);
     const { password_hash: _, ...safe } = board; return safe;
   }

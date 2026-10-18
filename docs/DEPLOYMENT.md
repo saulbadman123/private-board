@@ -12,6 +12,7 @@ Before you start, read `RUNBOOK.md` (backups, restore, capacity). A launch is no
    2. `supabase/migrations/202610160002_markdown_notes.sql`
    3. `supabase/migrations/202610160003_drawings.sql`
    4. `supabase/migrations/202610160004_search_filters.sql`
+   5. `supabase/migrations/202610160005_board_directory.sql`
 
    If a file fails, stop and read the error. Do not delete security statements to make it pass.
 3. **Storage:** confirm a bucket named `drawings` exists and is **Private** (migration 1 creates it). Do not add any storage policies.

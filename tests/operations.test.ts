@@ -14,7 +14,7 @@ async function migrated() {
     grant usage on schema public, storage to anon, authenticated, service_role;
     grant all on storage.objects to anon, authenticated, service_role;
   `);
-  for (const name of ['202610160001_foundation', '202610160002_markdown_notes', '202610160003_drawings', '202610160004_search_filters']) {
+  for (const name of ['202610160001_foundation', '202610160002_markdown_notes', '202610160003_drawings', '202610160004_search_filters', '202610160005_board_directory']) {
     await db.exec(await readFile(new URL(`../supabase/migrations/${name}.sql`, import.meta.url), 'utf8'));
   }
   const hash = 'scrypt$1$131072$8$1$' + '11'.repeat(16) + '$' + '22'.repeat(32);

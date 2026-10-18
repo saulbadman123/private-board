@@ -51,13 +51,23 @@ npm run ops:cleanup
 
 If `pg_cron` is enabled you can schedule `select public.cleanup_access_state();` instead. It deletes only `board_sessions` and `rate_limit_buckets`.
 
+### Delisting a board name (operator only)
+
+Listed boards can be found by name. The application can never change or remove a listing, and entries stay untouched. To hide an abusive or mistaken name, run this in the Supabase SQL Editor as the project owner:
+
+```sql
+update public.boards set listed = false where id = '<board uuid>';
+```
+
+The board, its password and its content are unchanged and it still opens from its link. A database trigger allows only this one change (true to false); relisting, renaming and deleting are rejected.
+
 ## 6. Monitoring (never record note text, cookies, or passwords)
 
 - Rate of 5xx and `UNAVAILABLE` responses; failed posts; `READ_ONLY` responses.
 - Image read errors (the API returns 503 on a checksum mismatch, which indicates corruption or tampering).
 - Many `429`/`ACCESS_DENIED` for one board or IP, which suggests password guessing.
 - Storage growth, backup freshness (last successful export and object copy), deployment errors.
-- GET feed URLs contain search filters. Restrict access to and retention of hosting logs.
+- GET feed URLs contain search filters, and `GET /api/boards?q=` contains the board-name search text. Restrict access to and retention of hosting logs.
 
 ## 7. Incident notes
 
@@ -67,7 +77,7 @@ If `pg_cron` is enabled you can schedule `select public.cleanup_access_state();`
 
 ## 8. Pre-launch checklist
 
-- [ ] Production Supabase project and private `drawings` bucket created; all four migrations applied in order.
+- [ ] Production Supabase project and private `drawings` bucket created; all five migrations applied in order.
 - [ ] Vercel secrets set for production only; `APP_ORIGIN` is the exact HTTPS origin.
 - [ ] Preview deployment tested against the development project (see `SETUP.md` smoke test).
 - [ ] `npm run test:database` passes against the target project.

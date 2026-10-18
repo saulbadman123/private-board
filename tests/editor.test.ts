@@ -17,7 +17,7 @@ function environment(){
 }
 
 test('editor preview, lost-response retry, remount, and success preserve the exact submitted draft',async()=>{
-  const env=environment();const id=randomUUID(),entryId=randomUUID();const sent:unknown[]=[];let dispose=()=>{};
+  const env=environment();const id=randomUUID(),entryId=randomUUID();const sent:unknown[]=[],paths:string[]=[];let dispose=()=>{};
   try{
     globalThis.fetch=async(_url,init)=>{
       if(init?.method==='POST'){
@@ -27,7 +27,7 @@ test('editor preview, lost-response retry, remount, and success preserve the exa
       }
       return Response.json({entries:[],nextCursor:null});
     };
-    const options={container:env.root,response:{board:{id,title:'Test',created_at:new Date().toISOString()},expiresAt:new Date(Date.now()+60000).toISOString()},signal:new AbortController().signal,navigate:()=>{},expired:()=>{throw new Error('Unexpected expiry');},toast:()=>{}};
+    const options={container:env.root,view:'compose' as const,response:{board:{id,title:'Test',created_at:new Date().toISOString()},expiresAt:new Date(Date.now()+60000).toISOString()},signal:new AbortController().signal,navigate:(path:string)=>{paths.push(path);},expired:()=>{throw new Error('Unexpected expiry');},toast:()=>{}};
     dispose=mountBoard(options);
     const textarea=env.root.querySelector<HTMLTextAreaElement>('#note-body')!;
     textarea.value='A **permanent** thought.';textarea.dispatchEvent(new env.dom.window.Event('input',{bubbles:true}));
@@ -42,6 +42,7 @@ test('editor preview, lost-response retry, remount, and success preserve the exa
     env.root.querySelector('form')!.dispatchEvent(new env.dom.window.Event('submit',{bubbles:true,cancelable:true}));
     await until(()=>!draftFor(id).attempt&&!draftFor(id).markdown);
     assert.deepEqual(sent[0],sent[1]);assert.equal(env.root.querySelector<HTMLTextAreaElement>('#note-body')!.value,'');assert(!env.root.querySelector<HTMLTextAreaElement>('#note-body')!.readOnly);
+    assert.deepEqual(paths,[`/b/${id}`]);
   }finally{dispose();clearDraft(id);env.restore();}
 });
 
@@ -61,7 +62,7 @@ test('drawing mode retains the note draft, freezes interrupted uploads, and retr
       }
       return Response.json({entries:[],nextCursor:null});
     };
-    const options={container:env.root,response:{board:{id,title:'Test',created_at:new Date().toISOString()},expiresAt:new Date(Date.now()+60000).toISOString()},signal:new AbortController().signal,navigate:()=>{},expired:()=>{},toast:()=>{}};
+    const options={container:env.root,view:'compose' as const,response:{board:{id,title:'Test',created_at:new Date().toISOString()},expiresAt:new Date(Date.now()+60000).toISOString()},signal:new AbortController().signal,navigate:()=>{},expired:()=>{},toast:()=>{}};
     dispose=mountBoard(options);
     const note=env.root.querySelector<HTMLTextAreaElement>('#note-body')!;note.value='My separate note draft';note.dispatchEvent(new env.dom.window.Event('input'));
     env.root.querySelector<HTMLButtonElement>('#mode-draw')!.click();await until(()=>!!env.root.querySelector('#post-drawing'));
@@ -87,7 +88,7 @@ test('expired posting retains a retryable draft and an invalid success response 
       if(init?.method==='POST'){posts++;return posts===1?Response.json({error:{message:'Expired',code:'LOCKED'}},{status:401}):Response.json({unexpected:'not an acknowledgment'});}
       return Response.json({entries:[],nextCursor:null});
     };
-    dispose=mountBoard({container:env.root,response:{board:{id,title:'Test',created_at:new Date().toISOString()},expiresAt:new Date(Date.now()+60000).toISOString()},signal:new AbortController().signal,navigate:()=>{},expired:()=>{expired++;},toast:()=>{}});
+    dispose=mountBoard({container:env.root,view:'compose',response:{board:{id,title:'Test',created_at:new Date().toISOString()},expiresAt:new Date(Date.now()+60000).toISOString()},signal:new AbortController().signal,navigate:()=>{},expired:()=>{expired++;},toast:()=>{}});
     const body=env.root.querySelector<HTMLTextAreaElement>('#note-body')!;body.value='Keep me';body.dispatchEvent(new env.dom.window.Event('input'));
     const submit=()=>env.root.querySelector('form')!.dispatchEvent(new env.dom.window.Event('submit',{cancelable:true}));
     submit();await until(()=>expired===1);const requestId=draftFor(id).attempt!.requestId;
@@ -101,7 +102,8 @@ test('browsing cancels stale searches, retains filters on return/post, filters t
   const env=environment(),id=randomUUID(),entryId=randomUUID();let dispose=()=>{},resolveOld:((value:Response)=>void)|undefined;
   const reads:{url:URL;signal:AbortSignal|null|undefined}[]=[];
   const entry={id:entryId,board_id:id,kind:'note',title:'Current match',tags:['idea'],created_at:new Date().toISOString(),excerpt:'Newest response'};
-  const options={container:env.root,response:{board:{id,title:'Test',created_at:new Date().toISOString()},expiresAt:new Date(Date.now()+60000).toISOString()},signal:new AbortController().signal,navigate:()=>{},expired:()=>{},toast:()=>{}};
+  const navigated:string[]=[];
+  const options={container:env.root,view:'feed' as 'feed'|'compose',response:{board:{id,title:'Test',created_at:new Date().toISOString()},expiresAt:new Date(Date.now()+60000).toISOString()},signal:new AbortController().signal,navigate:(path:string)=>{navigated.push(path);},expired:()=>{},toast:()=>{}};
   try{
     globalThis.fetch=async(url,init)=>{
       if(init?.method==='POST'){const payload=JSON.parse(String(init.body));return Response.json({entry:{...entry,markdown:payload.markdown},replayed:false});}
@@ -123,10 +125,17 @@ test('browsing cancels stale searches, retains filters on return/post, filters t
     await until(()=>reads.at(-1)!.url.searchParams.get('tag')==='idea');
     assert.equal(env.root.querySelector<HTMLInputElement>('#filter-tags')!.value,'idea');
     const kind=env.root.querySelector<HTMLSelectElement>('#filter-kind')!;kind.value='drawing';kind.dispatchEvent(new env.dom.window.Event('change'));
-    const note=env.root.querySelector<HTMLTextAreaElement>('#note-body')!;note.value='Keep my words';note.dispatchEvent(new env.dom.window.Event('input'));
+    draftFor(id).markdown='Keep my words';
     dispose();dispose=mountBoard({...options,signal:new AbortController().signal});
-    assert.equal(search().value,'new');assert.equal(env.root.querySelector<HTMLSelectElement>('#filter-kind')!.value,'drawing');assert.equal(env.root.querySelector<HTMLTextAreaElement>('#note-body')!.value,'Keep my words');
+    assert.equal(search().value,'new');assert.equal(env.root.querySelector<HTMLSelectElement>('#filter-kind')!.value,'drawing');
+    assert.equal(env.root.querySelector('#go-write')!.textContent,'Continue note');assert.equal(env.root.querySelector('#go-draw')!.textContent,'Draw');
+    assert.equal(env.root.querySelector('#note-form'),null);
+    dispose();dispose=mountBoard({...options,view:'compose',signal:new AbortController().signal});
+    assert.equal(env.root.querySelector<HTMLTextAreaElement>('#note-body')!.value,'Keep my words');assert.equal(env.root.querySelector('#feed'),null);
     env.root.querySelector('#note-form')!.dispatchEvent(new env.dom.window.Event('submit',{cancelable:true}));
+    await until(()=>navigated.length===1);assert.deepEqual(navigated,[`/b/${id}`]);assert.equal(draftFor(id).markdown,'');
+    dispose();dispose=mountBoard({...options,signal:new AbortController().signal});
+    assert.equal(env.root.querySelector('#go-write')!.textContent,'Write a note');
     await until(()=>!!env.root.querySelector('.post-status a'));
     assert.equal(search().value,'new');assert.equal(env.root.querySelector<HTMLSelectElement>('#filter-kind')!.value,'drawing');assert.match(env.root.querySelector('.post-status a')!.getAttribute('href')!,new RegExp(entryId));
     assert.equal(reads.at(-1)!.url.searchParams.get('kind'),'drawing');
