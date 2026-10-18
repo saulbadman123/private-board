@@ -9,7 +9,7 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}
 const timestamp=(s:unknown):s is string=>typeof s==='string'&&/^\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::\d{2})?)$/.test(s)&&Number.isFinite(Date.parse(s));
 const invalid=()=>new HttpError(400,'QUERY','Check the search filters, dates, or page cursor.');
 export function parseFeedQuery(params:URLSearchParams):FeedQuery {
-  const allowed=['q','kind','tag','from','to','sort','cursor'];
+  const allowed=['q','kind','tag','from','to','sort','cursor','path'];
   if([...params.keys()].some(k=>!allowed.includes(k)||params.getAll(k).length>(k==='tag'?5:1)))throw invalid();
   const q=(params.get('q')??'').trim();
   const kind=params.get('kind')??'all',sort=params.get('sort')??'newest';
