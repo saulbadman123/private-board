@@ -1,6 +1,12 @@
-# Private Board — Stage 7 / v0.5.0
+# Private Board — v0.5.1 / tab-return stability
 
 A small, mobile-first private Markdown and drawing board. Built with Vite, TypeScript, a Vercel Node.js API, and Supabase. No accounts and no browser-side database credentials. Start with `START-HERE.md` if you are upgrading an existing installation.
+
+## Latest update — stable tab return
+
+Switching tabs now conceals the board and checks access on return without rebuilding the page. Editor selection, preview mode, the drawing canvas, and feed pagination remain in place. Posts already being sent can finish in the background; their success is presented after access is confirmed. Offline access checks offer Retry without discarding the view.
+
+Actual reloads or tab/process closure still lose in-memory drafts. This update does not change the drawing dimensions, note limit, database schema, or permanent-post model. See [Batch 1 status and device checks](docs/UX-BATCH-1-STATUS.md). Layout, larger canvases, and overflow assistance are later batches.
 
 ## What works in this release
 
@@ -100,3 +106,4 @@ Published content is designed to be append-only, not administrator-proof or end-
 Sharp is a server dependency with platform-specific native components. Use normal `npm ci` installation with optional dependencies enabled; do not copy a `node_modules` folder between Windows and Linux. Vercel must install the dependencies for its own environment. Sharp and the Supabase SDK never enter the browser bundle.
 "# private-board" 
 "# private-board" 
+

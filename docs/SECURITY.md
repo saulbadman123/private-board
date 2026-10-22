@@ -6,7 +6,9 @@ Passwords are verified only by the Node.js server with asynchronous scrypt (N=13
 
 Random 32-byte session secrets live in HttpOnly cookies, never in URLs or localStorage. Only SHA-256 digests of those high-entropy secrets are stored. One browser secret can have separate, expiring board grants. Only recognized active browser tokens are reused, so a caller cannot choose a new session secret. Expiration is checked server-side on every protected operation.
 
-The frontend clears private board content when backgrounded or navigated away from and rechecks access on return. This minimizes stale data and browser snapshots; it cannot revoke content someone has already read or copied. The only localStorage item is the theme preference.
+On an ordinary tab switch, the frontend conceals the private surface, marks it inert and aria-hidden, and removes the private document title while retaining the mounted view in memory. Returning requires a fresh, board-scoped access check before revealing that same view. A failed network check keeps it concealed with a Retry action; a 401 or expired deadline opens the unlock gate. Access checks use their own cancellation scope and cannot reveal a disposed view. Expiry is also checked against the clock on resume because background timers can be delayed.
+
+An ordinary tab switch does not cancel a publication already in progress. A confirmed background post retains its acknowledgement and defers success navigation until access is validated; an uncertain outcome still retains its original request ID and bytes. Actual page departure (`pagehide`) disposes private content, and back-forward-cache restoration rechecks authorization through the router. Explicit Lock clears drafts, browse preferences, and pending publication receipts. Concealment is best effort against browser snapshots, not screenshot prevention, and cannot revoke content already read or copied. Private content is never persisted to localStorage or a service worker; the only localStorage item is the theme preference.
 
 ## Server boundary
 

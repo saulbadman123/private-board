@@ -5,17 +5,17 @@ import './browse.css';
 import { api, ApiError } from './api.ts';
 import type { BoardResponse } from './api.ts';
 import { cycleTheme, getTheme } from './theme.ts';
-import { mountBoard } from './board.ts';
+import { mountBoard, clearBoardReceipt } from './board.ts';
+import { mountBoardSession } from './board-session.ts';
 import { mountDirectory } from './directory.ts';
 import { clearDraft, hasDrafts } from './drafts.ts';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 const boardPattern = /^\/b\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/e\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})|\/(new))?\/?$/i;
 let request: AbortController | undefined;
-let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+let boardSession: ReturnType<typeof mountBoardSession> | undefined;
 let toastTimer: ReturnType<typeof setTimeout>;
 let generation = 0;
-let currentBoard: string | null = null;
 let privateVisible = false;
 let disposeBoard: (()=>void) | undefined;
 // Set when the user opens a board from search results, so the gate can name it. Listed titles are public.
@@ -89,7 +89,7 @@ function home() {
           clearSecrets(form);
           if (myGeneration !== generation) return;
           history.pushState({}, '', `/b/${response.board.id}`);
-          currentBoard = response.board.id; showBoard(response); toast('Board created. Keep the link and password safe.');
+          showBoard(response); toast('Board created. Keep the link and password safe.');
         } catch (error) { if (myGeneration === generation && !(error instanceof DOMException && error.name === 'AbortError')) formError(form, error instanceof Error ? error.message : 'Please try again.'); }
         finally { busy(form, false); }
       });
@@ -105,7 +105,7 @@ function home() {
 }
 
 function gate(boardId: string, errorMessage = '') {
-  disposeBoard?.();disposeBoard=undefined;clearTimeout(expiryTimer);
+  disposeBoard?.();disposeBoard=undefined;boardSession?.dispose();boardSession=undefined;
   generation++;request?.abort();request=new AbortController();
   privateVisible = false; document.title = 'Unlock board · Private Board';
   frame(`<section class="gate"><div class="gate-symbol">${icon('lock')}</div><div class="eyebrow">A space between you</div><h1>This board is private.</h1>${knownBoard?.id === boardId ? `<p class="gate-board">${escape(knownBoard.title)}</p>` : ''}<p class="muted gate-copy">Have the password? You’re in the right place.</p><form id="unlock-form">${passwordField('unlock-password', false)}<p class="form-error" role="alert" ${errorMessage ? '' : 'hidden'}>${escape(errorMessage)}</p><button class="primary" type="submit" data-label="Unlock board"><span class="button-label">Unlock board</span>${icon('arrow')}</button></form><a class="text-link" href="/" id="back-home">Back to home</a></section>`);
@@ -124,10 +124,10 @@ function gate(boardId: string, errorMessage = '') {
 
 function showBoard(response: BoardResponse) {
   disposeBoard?.();
-  clearTimeout(expiryTimer); privateVisible = true; currentBoard = response.board.id;
+  boardSession?.dispose();boardSession=undefined; privateVisible = true;
   document.title = `${response.board.title} · Private Board`;
-  frame(`<section class="board-header"><div><div class="eyebrow">${icon('lock')} Your private space${response.board.listed ? ' · Listed in search' : ''}</div><h1>${escape(response.board.title)}</h1></div><div class="board-actions"><button id="copy-link" class="secondary">${icon('link')} Copy link</button><button id="lock-board" class="icon-button" aria-label="Lock this board" title="Lock this board">${icon('lock')}</button></div></section><div id="board-content"></div>`, true);
-  disposeBoard=mountBoard({container:root.querySelector<HTMLElement>('#board-content')!,response,entryId:location.pathname.match(boardPattern)?.[2]?.toLowerCase(),view:location.pathname.match(boardPattern)?.[3]?'compose':'feed',signal:request!.signal,navigate,expired:message=>gate(response.board.id,message),toast});
+  frame(`<div id="private-surface"><section class="board-header"><div><div class="eyebrow">${icon('lock')} Your private space${response.board.listed ? ' · Listed in search' : ''}</div><h1>${escape(response.board.title)}</h1></div><div class="board-actions"><button id="copy-link" class="secondary">${icon('link')} Copy link</button><button id="lock-board" class="icon-button" aria-label="Lock this board" title="Lock this board">${icon('lock')}</button></div></section><div id="board-content"></div></div><section id="access-cover" class="access-cover" aria-label="Board access" hidden><div><p data-access-status role="status">Checking access…</p><button data-access-retry class="secondary" type="button" hidden>Retry access check</button></div></section>`, true);
+  disposeBoard=mountBoard({container:root.querySelector<HTMLElement>('#board-content')!,response,entryId:location.pathname.match(boardPattern)?.[2]?.toLowerCase(),view:location.pathname.match(boardPattern)?.[3]?'compose':'feed',signal:request!.signal,navigate,expired:message=>gate(response.board.id,message),toast,afterAccess:action=>boardSession?.runWhenVisible(action)});
   root.querySelector<HTMLButtonElement>('#copy-link')!.addEventListener('click', async () => {
     const url = `${location.origin}/b/${response.board.id}`;
     try { await navigator.clipboard.writeText(url); toast('Board link copied. Share the password separately.'); }
@@ -139,25 +139,25 @@ function showBoard(response: BoardResponse) {
     try {
       await api(`/api/boards/${response.board.id}/lock`, {}, request!.signal);
       if (myGeneration !== generation) return;
-      clearDraft(response.board.id);clearTimeout(expiryTimer); gate(response.board.id); toast('Board locked on this browser.');
+      clearDraft(response.board.id);clearBoardReceipt(response.board.id);gate(response.board.id); toast('Board locked on this browser.');
     } catch (error) {
       if (myGeneration !== generation) return;
       // Wipe content even when the network cannot confirm revocation; be candid.
-      clearDraft(response.board.id);gate(response.board.id, 'Content hidden, but locking could not be confirmed. Reconnect and unlock, then lock again.');
+      clearDraft(response.board.id);clearBoardReceipt(response.board.id);gate(response.board.id, 'Content hidden, but locking could not be confirmed. Reconnect and unlock, then lock again.');
     }
   });
-  expiryTimer = setTimeout(() => gate(response.board.id, 'Your access expired. Enter the password to open this board again.'), Math.max(0, Date.parse(response.expiresAt) - Date.now()));
+  boardSession=mountBoardSession({response,surface:root.querySelector<HTMLElement>('#private-surface')!,cover:root.querySelector<HTMLElement>('#access-cover')!,signal:request!.signal,expired:message=>gate(response.board.id,message)});
 }
 
 async function route() {
   disposeBoard?.();disposeBoard=undefined;
   generation++; const myGeneration = generation;
-  request?.abort(); request = new AbortController(); clearTimeout(expiryTimer); privateVisible = false;
-  currentBoard = null; document.title = 'Private Board';
+  request?.abort(); request = new AbortController(); boardSession?.dispose();boardSession=undefined; privateVisible = false;
+  document.title = 'Private Board';
   if (location.pathname === '/') { home(); return; }
   const match = location.pathname.match(boardPattern);
   if (!match) { frame('<section class="gate"><h1>A wrong turn.</h1><p class="muted">Check your board link, or use the name above to return home.</p></section>'); return; }
-  const id = match[1].toLowerCase(); currentBoard = id;
+  const id = match[1].toLowerCase();
   frame('<section class="gate loading" role="status"><span class="loading-dot"></span><p>Opening your space…</p></section>');
   try { const response = await api<BoardResponse>(`/api/boards/${id}`, undefined, request.signal); if (myGeneration === generation) showBoard(response); }
   catch (error) {
@@ -169,16 +169,14 @@ async function route() {
 
 window.addEventListener('popstate', () => void route());
 window.addEventListener('pageshow', e => { if (e.persisted) void route(); });
-// Hide private data before a page snapshot or while a background tab can go stale.
+// Actual page departure still disposes private content before a page snapshot.
+// Ordinary tab visibility is handled in place by mountBoardSession.
 function hidePrivate() {
   if(!privateVisible)return;
-  generation++;request?.abort();disposeBoard?.();disposeBoard=undefined;
+  generation++;boardSession?.dispose();boardSession=undefined;request?.abort();disposeBoard?.();disposeBoard=undefined;
   root.replaceChildren();document.title='Private Board';privateVisible=false;
 }
 window.addEventListener('pagehide',hidePrivate);
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && privateVisible) hidePrivate();
-  else if (!document.hidden && currentBoard && root.childElementCount === 0) void route();
-});
 window.addEventListener('beforeunload',e=>{if(hasDrafts()){e.preventDefault();e.returnValue='';}});
 void route();
+

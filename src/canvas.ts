@@ -43,11 +43,18 @@ export function attachCanvas(canvas:HTMLCanvasElement,options:Options){
     if(id===null)return;
     try{if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}catch{/* already released */}
   }
+  // Flush the stroke before the tab stops producing animation frames. Leaving
+  // the tab must not join the old stroke to a new pointer position on return.
+  const document=canvas.ownerDocument;
+  const visibilityChanged=()=>{if(document?.hidden)finish();};
+  document?.addEventListener('visibilitychange',visibilityChanged);
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);
   canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);canvas.addEventListener('lostpointercapture',end);
   return {flush,finish,clear(){finish();context.fillStyle='#ffffff';context.fillRect(0,0,canvas.width,canvas.height);},dispose(){
+    document?.removeEventListener('visibilitychange',visibilityChanged);
     canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);
     canvas.removeEventListener('pointerup',end);canvas.removeEventListener('pointercancel',end);canvas.removeEventListener('lostpointercapture',end);
     finish();
   }};
 }
+
