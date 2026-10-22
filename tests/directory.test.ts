@@ -205,6 +205,17 @@ test('home search waits for 2 characters, cancels stale requests, and renders ti
   } finally { dispose(); env.restore(); }
 });
 
+test('home search restores a kept query when the Find tab is shown again', async () => {
+  const env = environment(); const urls: string[] = []; let dispose = () => {};
+  try {
+    globalThis.fetch = async url => { urls.push(String(url)); return Response.json({ boards: [{ id: randomUUID(), title: 'Garden club', created_at: new Date().toISOString() }], more: false }); };
+    dispose = mountDirectory(env.root, { navigate: () => {}, opened: () => {}, initialQuery: 'garden' });
+    assert.equal(env.root.querySelector<HTMLInputElement>('#board-find')!.value, 'garden');
+    await until(() => !!env.root.querySelector('#find-results a'));
+    assert.deepEqual(urls, ['/api/boards?q=garden']);
+  } finally { dispose(); env.restore(); }
+});
+
 test('home search explains empty results and failures', async () => {
   const env = environment(); let mode: 'empty' | 'limited' | 'down' = 'empty'; let dispose = () => {};
   try {

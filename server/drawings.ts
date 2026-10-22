@@ -1,6 +1,7 @@
 import {HttpError} from './errors.ts';
 import {checksum,MAX_DRAWING_REQUEST,MAX_IMAGE_BYTES,optimizeDrawing} from './images.ts';
 import {prepareNote,NoteStoreError} from './notes.ts';
+import {characterCount,MAX_CAPTION_CHARACTERS} from '../shared/note-limits.ts';
 import type {Store} from './types.ts';
 
 async function multipart(request:Request):Promise<FormData>{
@@ -28,7 +29,7 @@ export async function postDrawing(request:Request,store:Store,boardId:string,tok
   let tags:unknown;try{tags=JSON.parse(text('tags','[]'));}catch{throw new HttpError(400,'DRAWING','The drawing tags are invalid.');}
   const meta=prepareNote({kind:'note',requestId:text('requestId'),title:text('title'),tags,markdown:'drawing'});
   const caption=text('caption').trim();
-  if([...caption].length>280||caption.includes('\u0000')||Buffer.from(caption).toString('utf8')!==caption)throw new HttpError(400,'DRAWING','Use a description of up to 280 characters.');
+  if(characterCount(caption)>MAX_CAPTION_CHARACTERS||caption.includes('\u0000')||Buffer.from(caption).toString('utf8')!==caption)throw new HttpError(400,'DRAWING','Use a description of up to 280 characters.');
   const input=Buffer.from(await image.arrayBuffer());
   const hash=checksum(Buffer.from(JSON.stringify(['drawing',meta.title,caption,meta.tags,checksum(input)])));
   const previous=await store.submission(boardId,meta.requestId);

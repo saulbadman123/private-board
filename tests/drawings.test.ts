@@ -72,10 +72,20 @@ test('multipart rejects duplicate fields, untrusted paths, oversized bodies, and
 test('image validation blocks corrupt files, SVG, animation, format mismatches, large dimensions and byte limits',async()=>{
   const png=await image();
   for(const [data,mime]of [[Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),'image/png'],[Buffer.from('not a png'),'image/png'],[png,'image/webp']] as const)await assert.rejects(optimizeDrawing(data,mime),{status:400});
-  const tooWide=await sharp({create:{width:1025,height:10,channels:3,background:'white'}}).png().toBuffer();await assert.rejects(optimizeDrawing(tooWide,'image/png'),{status:400});
+  const tooWide=await sharp({create:{width:1601,height:10,channels:3,background:'white'}}).png().toBuffer();await assert.rejects(optimizeDrawing(tooWide,'image/png'),{status:400});
+  const tooTall=await sharp({create:{width:10,height:1201,channels:3,background:'white'}}).png().toBuffer();await assert.rejects(optimizeDrawing(tooTall,'image/png'),{status:400});
+  const tooMany=await sharp({create:{width:1600,height:1201,channels:3,background:'white'}}).png().toBuffer();await assert.rejects(optimizeDrawing(tooMany,'image/png'),{status:400});
   await assert.rejects(optimizeDrawing(Buffer.alloc(3*1024*1024+1),'image/png'),{status:413});
   const animated=Buffer.concat([png.subarray(0,8),Buffer.from([0,0,0,0]),Buffer.from('acTL'),Buffer.alloc(4),png.subarray(8)]);await assert.rejects(optimizeDrawing(animated,'image/png'),/Animated/);
   const webp=Buffer.concat([Buffer.from('RIFF'),Buffer.alloc(4),Buffer.from('WEBPANIM'),Buffer.alloc(4)]);await assert.rejects(optimizeDrawing(webp,'image/webp'),/Animated/);
+});
+
+test('both paper sizes are accepted at their exact dimensions and keep them',async()=>{
+  for(const [width,height] of [[1024,768],[1600,1200]]){
+    const source=await sharp({create:{width,height,channels:3,background:'white'}}).png().toBuffer();
+    const optimized=await optimizeDrawing(source,'image/png');
+    assert.equal(optimized.width,width);assert.equal(optimized.height,height);
+  }
 });
 
 test('optimization is lossless over opaque white and removes metadata',async()=>{

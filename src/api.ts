@@ -6,6 +6,20 @@ export class ApiError extends Error {
   code: string;
   constructor(message: string, status: number, code: string) { super(message); this.status = status; this.code = code; }
 }
+// Fetches a private file (a drawing's stored bytes) through the same authorized route the page uses; never a public or signed URL.
+export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  let response: Response;
+  try { response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', signal }); }
+  catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new ApiError('Could not connect. Please try again.', 0, 'NETWORK');
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(data?.error?.message ?? 'Something went wrong. Please try again.', response.status, data?.error?.code ?? 'UNKNOWN');
+  }
+  return response.blob();
+}
 export async function api<T>(path: string, input?: unknown, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {

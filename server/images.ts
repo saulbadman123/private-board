@@ -1,7 +1,8 @@
 import sharp from 'sharp';
 import {createHash} from 'node:crypto';
 import {HttpError} from './errors.ts';
-export const MAX_IMAGE_BYTES=3*1024*1024;
+import {MAX_DRAWING_HEIGHT,MAX_DRAWING_PIXELS,MAX_DRAWING_WIDTH,MAX_IMAGE_BYTES} from '../shared/drawing-limits.ts';
+export {MAX_IMAGE_BYTES};
 export const MAX_DRAWING_REQUEST=3.5*1024*1024;
 export const checksum=(data:Uint8Array)=>createHash('sha256').update(data).digest('hex');
 let processing=0;
@@ -27,9 +28,9 @@ export async function optimizeDrawing(input:Buffer,declaredMime:string){
   if(processing>=2)throw new HttpError(503,'BUSY','Drawing processing is busy. Retry in a moment.',2);
   processing++;
   try{
-    const source=sharp(input,{limitInputPixels:1024*768,failOn:'warning',animated:false});
+    const source=sharp(input,{limitInputPixels:MAX_DRAWING_PIXELS,failOn:'warning',animated:false});
     const metadata=await source.metadata();
-    if(metadata.format!==format||!metadata.width||!metadata.height||metadata.width>1024||metadata.height>768||(metadata.pages??1)!==1)throw new HttpError(400,'IMAGE','Drawings must be a single image, up to 1024 × 768 pixels.');
+    if(metadata.format!==format||!metadata.width||!metadata.height||metadata.width>MAX_DRAWING_WIDTH||metadata.height>MAX_DRAWING_HEIGHT||(metadata.pages??1)!==1)throw new HttpError(400,'IMAGE',`Drawings must be a single image, up to ${MAX_DRAWING_WIDTH} × ${MAX_DRAWING_HEIGHT} pixels.`);
     const pipeline=source.flatten({background:'#ffffff'}).toColourspace('srgb').removeAlpha();
     const png=await pipeline.clone().png({compressionLevel:9,adaptiveFiltering:true}).timeout({seconds:5}).toBuffer();
     const webp=await pipeline.clone().webp({lossless:true,effort:4}).timeout({seconds:5}).toBuffer();

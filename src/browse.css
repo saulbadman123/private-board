@@ -1,15 +1,16 @@
-.browse{margin-bottom:20px;min-width:0}
-.search-field label{font-size:13px;font-weight:600;display:block;margin-bottom:8px}
+.browse{margin-bottom:16px;min-width:0}
+.browse-bar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}
+.kind-field select{width:auto;min-width:160px}
 .search-field input,.filter-field input,.filter-field select{display:block;width:100%;min-width:0;min-height:48px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--text);background:var(--surface);font-family:inherit;font-size:16px;line-height:1.4}
-.search-field small,.filter-field small,.filter-help{display:block;font-size:11px;color:var(--muted);line-height:1.7;margin-top:7px}
-#feed-filters{border-bottom:1px solid var(--line);margin-top:8px}
+.search-help,.filter-field small,.filter-help{display:block;font-size:12px;color:var(--muted);line-height:1.6;margin-top:7px}
+#feed-filters{border-bottom:1px solid var(--line);margin-top:4px}
 #feed-filters summary{cursor:pointer;min-height:48px;padding-block:14px;font-size:12px;font-weight:600}
 #active-filters{color:var(--accent);margin-left:4px}
 .filter-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;padding-block:6px}
 .filter-field label{display:block;margin-bottom:7px;font-size:12px;font-weight:600}
 .filter-wide{grid-column:1/-1}.filter-help{margin-bottom:16px}
-.filter-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;font-size:11px;color:var(--muted)}
-.entry-tags>button{font:inherit;font-size:11px;color:var(--accent);background:var(--soft);border:0;border-radius:8px;min-height:44px;padding:8px 12px;overflow-wrap:anywhere;max-width:100%;text-align:left}
+.filter-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;font-size:12px;color:var(--muted)}
+.entry-tags>button{font:inherit;font-size:12px;color:var(--accent);background:var(--soft);border:0;border-radius:8px;min-height:44px;padding:8px 12px;overflow-wrap:anywhere;max-width:100%;text-align:left}
 .entry-tags>button:hover{outline:1px solid var(--accent)}
 .feed-status{min-height:20px}.pagination{flex-wrap:wrap}.open-note{min-height:44px}
 .composer-heading .secondary,.format-toolbar button{min-height:44px}
@@ -17,13 +18,25 @@
 .post-status a{color:var(--accent);display:inline-block;min-height:44px;padding-block:12px;margin-left:8px;text-underline-offset:3px}
 #feed[aria-busy=true]{opacity:.6}#feed{transition:opacity .1s}
 .draw-colors .color-swatch{min-width:44px;width:44px}select{outline-offset:4px}
+@media(max-width:480px){.browse-bar{grid-template-columns:minmax(0,1fr)}.kind-field select{width:100%}}
 @media(max-width:420px){.filter-grid{grid-template-columns:minmax(0,1fr);gap:14px}.filter-wide{grid-column:auto}.entry-meta{flex-wrap:wrap}.composer-heading{align-items:flex-start}.composer-heading p{max-width:170px}.post-row{gap:10px}.pagination>*{flex:1}input[type=date]{max-width:100%}}
 @media(prefers-reduced-motion:reduce){#feed{transition:none}}
 
-.compose-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 24px}
-.compose-actions a{margin:0;min-height:48px;text-decoration:none;text-align:center}
-.compose-actions a.secondary{color:inherit}
-#back-board{display:inline-block;margin-bottom:14px}
+.compose-fab{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));z-index:10;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.compose-toggle{width:56px;height:56px;padding:0;border:0;border-radius:50%;background:var(--accent);color:var(--accent-text);display:grid;place-items:center;box-shadow:0 4px 18px #0003}
+.compose-toggle:hover{filter:brightness(1.07)}.compose-toggle .icon{width:26px;height:26px;transition:transform .15s}
+.compose-toggle[aria-expanded=true] .icon{transform:rotate(45deg)}
+.compose-menu{width:min(220px,calc(100vw - 32px));max-height:calc(100dvh - 104px);overflow:auto;display:grid;gap:2px;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:0 8px 28px #0003}
+.compose-choice{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 12px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;color:var(--text)}
+.compose-choice:hover{background:var(--soft)}.compose-choice .icon{width:20px;height:20px;color:var(--accent)}
+.with-compose{padding-bottom:104px}
+/* Home card: on a roomy desktop the Find tab reserves the Create form's height (measured 639px at 1366px wide with the system font stack), so the footer stays put. It is a floor, never a cap. */
+@media(min-width:761px) and (min-height:900px){#access-content{min-height:640px}}
+.panel-tabs button:disabled{opacity:.6;cursor:wait}
+@media(min-width:761px){.compose-fab{right:max(24px,env(safe-area-inset-right));bottom:max(24px,env(safe-area-inset-bottom))}}
+/* Toasts clear the button on narrow screens, and move to the top while its choices are open. */
+@media(max-width:640px){.has-compose .toast{bottom:max(96px,calc(env(safe-area-inset-bottom) + 88px))}.compose-open .toast{bottom:auto;top:max(16px,env(safe-area-inset-top))}}
+#back-board{display:inline-flex;margin-bottom:6px}
 
 .find-status{min-height:1.4em;margin:6px 0 10px;font-size:12px;color:var(--muted,inherit)}
 .find-results{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}

@@ -8,7 +8,8 @@ export function mountBrowse(boardId:string,before:HTMLElement,changed:(debounce:
   let state=states.get(boardId);if(!state){state=emptyBrowse();states.set(boardId,state);}
   const current=state;
   const root=document.createElement('section');root.className='browse';root.setAttribute('aria-label','Find entries');
-  root.innerHTML=`<div class="search-field" role="search"><label for="board-search">Find a thought</label><input id="board-search" type="search" maxlength="200" placeholder="Search this board…" autocomplete="off" aria-describedby="search-help"/><small id="search-help">Matches all words in notes, titles, tags, and drawing descriptions.</small></div><details id="feed-filters"><summary>Filters & sort <span id="active-filters"></span></summary><div class="filter-grid"><div class="filter-field"><label for="filter-kind">Content</label><select id="filter-kind"><option value="all">Notes & drawings</option><option value="note">Notes only</option><option value="drawing">Drawings only</option></select></div><div class="filter-field"><label for="filter-sort">Order</label><select id="filter-sort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="relevance">Most relevant</option></select></div><div class="filter-field"><label for="filter-from">From date</label><input id="filter-from" type="date" min="1900-01-01" max="9998-12-31"/></div><div class="filter-field"><label for="filter-to">Through date</label><input id="filter-to" type="date" min="1900-01-01" max="9998-12-31"/></div><div class="filter-field filter-wide"><label for="filter-tags">Tags</label><input id="filter-tags" placeholder="ideas, reminders" autocomplete="off" aria-describedby="filter-tags-help"/><small id="filter-tags-help">Up to five, separated by commas. Entries must have every selected tag.</small></div></div><p class="filter-help">Dates use your local time zone. Relevance is available when searching.</p></details><div class="filter-actions"><span id="filter-summary"></span><button class="text-button" type="button" id="clear-filters" hidden>Clear filters</button></div><p id="filter-error" class="form-error" role="alert" hidden></p>`;
+  // Search and content type sit in one compact bar; dates, tags, and order stay a tap away.
+  root.innerHTML=`<div class="browse-bar"><div class="search-field" role="search"><label class="sr-only" for="board-search">Search this board</label><input id="board-search" type="search" maxlength="200" placeholder="Search this board…" autocomplete="off" aria-describedby="search-help"/></div><div class="filter-field kind-field"><label class="sr-only" for="filter-kind">Content</label><select id="filter-kind"><option value="all">Notes & drawings</option><option value="note">Notes only</option><option value="drawing">Drawings only</option></select></div></div><small id="search-help" class="search-help">Matches all words in notes, titles, tags, and drawing descriptions.</small><details id="feed-filters"><summary>More filters & sort <span id="active-filters"></span></summary><div class="filter-grid"><div class="filter-field"><label for="filter-from">From date</label><input id="filter-from" type="date" min="1900-01-01" max="9998-12-31"/></div><div class="filter-field"><label for="filter-to">Through date</label><input id="filter-to" type="date" min="1900-01-01" max="9998-12-31"/></div><div class="filter-field"><label for="filter-sort">Order</label><select id="filter-sort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="relevance">Most relevant</option></select></div><div class="filter-field"><label for="filter-tags">Tags</label><input id="filter-tags" placeholder="ideas, reminders" autocomplete="off" aria-describedby="filter-tags-help"/><small id="filter-tags-help">Up to five, separated by commas. Entries must have every selected tag.</small></div></div><p class="filter-help">Dates use your local time zone. Relevance is available when searching.</p></details><div class="filter-actions"><span id="filter-summary"></span><button class="text-button" type="button" id="clear-filters" hidden>Clear filters</button></div><p id="filter-error" class="form-error" role="alert" hidden></p>`;
   before.before(root);
   const input=(id:string)=>root.querySelector<HTMLInputElement>(`#${id}`)!;
   const search=input('board-search'),tags=input('filter-tags'),from=input('filter-from'),to=input('filter-to');
@@ -20,9 +21,12 @@ export function mountBrowse(boardId:string,before:HTMLElement,changed:(debounce:
     if(!current.q.trim()&&current.sort==='relevance')current.sort='newest';
     search.value=current.q;tags.value=current.tags;from.value=current.from;to.value=current.to;kind.value=current.kind;sort.value=current.sort;
     sort.querySelector<HTMLOptionElement>('[value=relevance]')!.disabled=!current.q.trim();
-    const count=Number(current.kind!=='all')+Number(!!current.tags.trim())+Number(!!(current.from||current.to));
+    // Counts what is inside the collapsed section; the content type is always visible beside the search.
+    const count=Number(current.sort!=='newest')+Number(!!current.tags.trim())+Number(!!(current.from||current.to));
     root.querySelector('#active-filters')!.textContent=count?`(${count})`:'';
     clear.hidden=!filtered()&&current.sort==='newest';
+    // With nothing to clear, the entry count below already says everything this row would.
+    root.querySelector<HTMLElement>('.filter-actions')!.hidden=clear.hidden;
     root.querySelector('#filter-summary')!.textContent=filtered()?'Showing matching entries':'All entries';
   }
   function update(debounce:boolean){error.hidden=true;sync();changed(debounce);}
@@ -36,7 +40,7 @@ export function mountBrowse(boardId:string,before:HTMLElement,changed:(debounce:
   kind.addEventListener('change',()=>{current.kind=kind.value as BrowseState['kind'];update(false);});
   sort.addEventListener('change',()=>{current.sort=sort.value as BrowseState['sort'];update(false);});
   clear.addEventListener('click',()=>{Object.assign(current,emptyBrowse());update(false);});
-  if(current.kind!=='all'||current.tags||current.from||current.to||current.sort!=='newest')details.open=true;
+  if(current.tags||current.from||current.to||current.sort!=='newest')details.open=true;
   sync();
   return {
     filtered,

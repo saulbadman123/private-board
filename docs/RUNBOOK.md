@@ -77,7 +77,7 @@ The board, its password and its content are unchanged and it still opens from it
 
 ## 8. Pre-launch checklist
 
-- [ ] Production Supabase project and private `drawings` bucket created; all five migrations applied in order.
+- [ ] Production Supabase project and private `drawings` bucket created; all six migrations applied in order.
 - [ ] Vercel secrets set for production only; `APP_ORIGIN` is the exact HTTPS origin.
 - [ ] Preview deployment tested against the development project (see `SETUP.md` smoke test).
 - [ ] `npm run test:database` passes against the target project.

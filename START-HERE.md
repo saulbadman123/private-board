@@ -1,4 +1,8 @@
-# Private Board v0.5.0 — Start here
+# Private Board v0.6.0 — Start here
+
+## Upgrading from v0.5.0 (drawing room)
+
+Run **only** `supabase/migrations/202610220001_large_drawings.sql` in the Supabase SQL Editor, then deploy the new source. The migration widens two size checks and touches no published entry. Deploy the migration first: until it is applied, posting a Large-paper drawing fails. Standard-paper drawings work either way.
 
 ## Already using Stage 3?
 
@@ -14,7 +18,7 @@ For Vercel, apply the new migration, update the source, and redeploy the complet
 
 ## Starting from scratch or an older stage?
 
-Follow `README.md`. A fresh database needs all five migrations in filename order. A Stage 1 database needs migrations two, three, and four. A Stage 2 database needs migrations three and four. Never rerun migrations already applied successfully.
+Follow `README.md`. A fresh database needs all six migrations in filename order. A Stage 1 database needs migrations two, three, and four. A Stage 2 database needs migrations three and four. Never rerun migrations already applied successfully.
 
 Use Node.js 24 LTS, create `.env.local` from `.env.example`, and run `npm ci` then `npm run dev`. Open the Vite address, not the source `index.html` by double-clicking it.
 
@@ -32,13 +36,17 @@ The existing system/light/dark theme, Markdown editor, drawing tools, password p
 
 ## Verification and deployment
 
-Run `npm run verify`. Release results and remaining real-device/provider checks are in `docs/STAGE-4-STATUS.md`; setup and deployment checks are in `docs/SETUP.md`.
+Run `npm run verify`. Release results and remaining real-device/provider checks are in `docs/STAGE-8-STATUS.md`; setup and deployment checks are in `docs/SETUP.md`.
 
 This archive is source code, not a live deployment. Your Vercel/Supabase projects were not changed while producing it.
 
 ## Stage 5 addendum
 
 Stage 5 adds a read-only capacity switch (`WRITES_DISABLED`), extra response headers, operator scripts (`npm run ops:integrity`, `npm run ops:cleanup`), `supabase/ops/after-restore.sql`, and `docs/RUNBOOK.md`. No migration is needed; upgrade by replacing the source. **This stage was written without Node.js available and is untested: run `npm ci` and `npm run verify` first.** See `docs/STAGE-5-STATUS.md`.
+
+## Stage 8 addendum (v0.6.0)
+
+Stage 8 is the layout, drawing, and comfort update: switching tabs no longer reloads the board, a floating **New post** button, a stable home screen, the feed returns to your place, a wider drawing room (Expand, zoom, Pan, Undo/Redo, Standard or Large paper), a drawing viewer, and a recovery flow for notes over 20,000 characters (review a split, keep the rest in this tab, continue when you choose). Entries can be copied as Markdown and drawings downloaded. **The only database change is `202610220001_large_drawings.sql`; run it before deploying.** `npm run verify` passed on Node 24.22.1; real-device and screen-reader checks are listed in `docs/STAGE-8-STATUS.md`.
 
 ## Going live (Stage 6)
 
