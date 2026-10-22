@@ -6,10 +6,11 @@ import { draftFor, drawingDraftFor } from './drafts.ts';
 import {mountBrowse} from './browse.ts';
 
 export type BoardView='feed'|'compose';
-type Options={container:HTMLElement;response:BoardResponse;entryId?:string;view?:BoardView;signal:AbortSignal;navigate:(path:string)=>void;expired:(message:string)=>void;toast:(message:string)=>void;};
+type Options={container:HTMLElement;response:BoardResponse;entryId?:string;view?:BoardView;signal:AbortSignal;navigate:(path:string)=>void;expired:(message:string)=>void;toast:(message:string)=>void;afterAccess?:(action:()=>void)=>void;};
 const formats=[['Bold','bold'],['Italic','italic'],['List','list'],['Link','link'],['Code','code']] as const;
 // Hand-off from the composer page to the board page. Held in memory only, never in the URL.
 let justPosted:{boardId:string;result:PostResponse}|null=null;
+export function clearBoardReceipt(boardId:string){if(justPosted?.boardId===boardId)justPosted=null;}
 function date(value: string) { return new Date(value).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}); }
 function tagsMarkup(tags: string[]) { return tags.length ? `<div class="entry-tags">${tags.map(t=>`<span>#${escapeHtml(t)}</span>`).join('')}</div>` : ''; }
 function internalLink(el: HTMLAnchorElement, navigate: Options['navigate']) {
@@ -72,6 +73,9 @@ export function mountBoard(options: Options): () => void {
   const draft=draftFor(boardId);
 
   if (options.view==='compose') {
+    // A background acknowledgement survives an intervening unlock gate. It is
+    // already saved; return to its feed receipt rather than offer another post.
+    if(justPosted?.boardId===boardId)queueMicrotask(()=>{if(alive()){const show=()=>navigate(`/b/${boardId}`);if(options.afterAccess)options.afterAccess(show);else show();}});
     container.innerHTML=`<a id="back-board" class="text-link" href="/b/${boardId}">← Back to board</a><section class="composer" aria-label="Write a note"><div class="composer-heading"><div><h2>Leave a thought.</h2><p>Something small. Something worth keeping.</p></div></div><div id="composer-body"><form id="note-form"><div class="editor-tabs" role="tablist" aria-label="Note editor"><button type="button" id="write-tab" role="tab" aria-selected="true" aria-controls="write-panel">Write</button><button type="button" id="preview-tab" role="tab" aria-selected="false" tabindex="-1" aria-controls="preview-panel">Preview</button></div><div id="write-panel" role="tabpanel" aria-labelledby="write-tab"><div class="format-toolbar" aria-label="Formatting helpers">${formats.map(([label,type])=>`<button type="button" data-format="${type}" aria-label="Insert ${label.toLowerCase()} formatting">${label}</button>`).join('')}</div><label class="sr-only" for="note-body">Your note in Markdown</label><textarea id="note-body" name="markdown" placeholder="What would you like to leave here?" required spellcheck="true" aria-describedby="note-help note-count"></textarea><div class="editor-hint"><span id="note-help">Markdown welcome. Plain words, too.</span><span id="note-count"></span></div></div><div id="preview-panel" role="tabpanel" aria-labelledby="preview-tab" hidden><div id="note-preview" class="markdown"></div></div><details id="note-details"><summary>Title & tags <span>(optional)</span></summary><div class="metadata-fields"><div class="field"><label for="note-title">Title</label><input id="note-title" name="title" maxlength="120" placeholder="A few words to find it later"/></div><div class="field"><label for="note-tags">Tags</label><input id="note-tags" name="tags" placeholder="ideas, reminders" aria-describedby="tag-help"/><small id="tag-help">Up to five tags, separated by commas.</small></div></div></details><p id="attempt-hint" class="soft-notice" hidden>Checking the same submission. Keep this tab open and use Retry to avoid posting it twice.</p><p id="post-error" class="form-error" role="alert" hidden></p><div class="post-row"><p>Posts are permanent.<br/><span>Check before posting.</span></p><button id="post-note" class="primary" type="submit">Post note <span aria-hidden="true">↗</span></button></div></form></div></section>`;
     const back=container.querySelector<HTMLAnchorElement>('#back-board')!;
     back.addEventListener('click',e=>{
@@ -89,7 +93,11 @@ export function mountBoard(options: Options): () => void {
     const drawComposer=document.createElement('section');drawComposer.id='draw-composer';drawComposer.className='composer';drawComposer.hidden=true;drawComposer.setAttribute('role','tabpanel');drawComposer.setAttribute('aria-labelledby','mode-draw');writeComposer.after(drawComposer);
     const modeTabs=[modes.querySelector<HTMLButtonElement>('#mode-write')!,modes.querySelector<HTMLButtonElement>('#mode-draw')!];
     let drawingMounted=false,drawingLoading=false;
-    const finish=(result:PostResponse,message:string)=>{toast(message);justPosted={boardId,result};navigate(`/b/${boardId}`);};
+    const finish=(result:PostResponse,message:string)=>{
+      justPosted={boardId,result};
+      const show=()=>{if(alive()){toast(message);navigate(`/b/${boardId}`);}};
+      if(options.afterAccess)options.afterAccess(show);else show();
+    };
     function selectMode(mode:'write'|'draw'){
       draft.mode=mode;writeComposer.hidden=mode!=='write';drawComposer.hidden=mode!=='draw';
       modeTabs.forEach((tab,index)=>{const selected=(mode==='write'?0:1)===index;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;});
@@ -235,3 +243,4 @@ export function mountBoard(options: Options): () => void {
   void loadPage();
   return ()=>{active=false;previewVersion++;cancelFeed();signal.removeEventListener('abort',cancelFeed);};
 }
+
